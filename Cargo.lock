@@ -136,6 +136,7 @@ name = "rapt"
 version = "0.1.0"
 dependencies = [
  "arduino-uno",
+ "atmega328p-hal",
  "avr-hal-generic",
  "avr-std-stub",
  "nb 0.1.3",

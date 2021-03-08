@@ -1,15 +1,33 @@
 #![no_std]
 #![no_main]
+#![deny(
+    missing_docs,
+    trivial_numeric_casts,
+    unconditional_recursion,
+    unused_import_braces,
+    unused_lifetimes,
+    unused_qualifications,
+    unused_extern_crates,
+    unused_parens,
+    while_true,
+//    warnings,
+)]
 
-extern crate avr_std_stub;
-mod line_buffer;
+//! Simple example of line editor via USART
 
 use arduino_uno::prelude::*;
 use arduino_uno::Serial;
+use atmega328p_hal::port::mode;
+use atmega328p_hal::port::Pin;
 use avr_hal_generic::usart::{Usart, UsartOps};
+use avr_std_stub as _;
 use ufmt;
 
+mod line_buffer;
 use line_buffer::LineBuffer;
+
+mod atoi;
+use atoi::atoi_u8;
 
 const MAX_BUF_LEN: usize = 128;
 static mut LINE_BUFFER: [u8; MAX_BUF_LEN] = [0; MAX_BUF_LEN];
@@ -24,8 +42,39 @@ w - write value to an output pin\r
 r - read value of an input pin\r
 ";
 
+/// Pin can be in one of states.
+enum PinState {
+    /// Pin is not configured yet.
+    Unknown,
+
+    /// Pin is reserved for a reason.
+    Reserved,
+
+    //  /// Pin configured as an ADC channel.
+    //  InputAnalog(Pin<mode::Input<mode::Analog>>),
+    /// Pin input configured without internal pull-up.
+    /// Default state of the pin.
+    InputFloating(Pin<mode::Input<mode::Floating>>),
+
+    /// Pin configured as a digital input
+    /// Pin input configured with internal pull-up.
+    InputPullUp(Pin<mode::Input<mode::PullUp>>),
+
+    /// Pin configured as a digital input
+    /// Pin input configured with internal pull-up.
+    InputAnalog(Pin<mode::Input<mode::PullUp>>),
+
+    /// Pin configured as a digital output
+    Output(Pin<mode::Output>),
+
+    //  ///Pin configured as PWM output
+    //  Pwm(Pin<mode::Pwm<>>),
+    ///Pin configured in open drain mode.
+    TriState(Pin<mode::TriState>),
+}
+
 /// Print error message to serial.
-pub fn error<USART, PD0, PD1, CLOCK>(serial: &mut Usart<USART, PD0, PD1, CLOCK>, message: &str)
+fn error<USART, PD0, PD1, CLOCK>(serial: &mut Usart<USART, PD0, PD1, CLOCK>, message: &str)
 where
     USART: UsartOps<PD0, PD1>,
 {
@@ -51,6 +100,26 @@ fn main() -> ! {
 
     let mut line_buffer = unsafe { LineBuffer::new(&mut LINE_BUFFER) };
 
+    let pin_state = [
+        // Pins 0 and 1 are reserved for USART.
+        PinState::Reserved,
+        PinState::Reserved,
+        // Digital pins
+        PinState::TriState(pins.d2.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d3.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d4.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d5.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d6.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d7.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d8.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d9.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d10.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d11.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d12.into_tri_state(&pins.ddr).downgrade()),
+        PinState::TriState(pins.d13.into_tri_state(&pins.ddr).downgrade()),
+        // TODO: Analog pins
+    ];
+
     loop {
         // Write prompt message to USART.
         ufmt::uwrite!(&mut serial, "\x1B[1mrapt>\x1B[0m ").void_unwrap();
@@ -60,17 +129,57 @@ fn main() -> ! {
             // Execute commands
             for command in line_buffer.words() {
                 match command {
+                    // h - help
                     [b'h', ..] => ufmt::uwrite!(&mut serial, "{}", HELP).void_unwrap(),
-                    [b'r', tail @ ..] => match tail {
-                        [b'0'] | [b'1'] => error(&mut serial, "Pin is reserved for USART."),
-                        [b'2'] => ufmt::uwrite!(
-                            &mut serial,
-                            "p2{} ",
-                            if pins.d2.is_high().unwrap() { "H" } else { "L" }
-                        )
-                        .void_unwrap(),
-                        _ => error(&mut serial, "Invalid pin number."),
-                    }, // TODO: turn pin into output pin
+
+                    // r - read value of a pin
+                    [b'r', tail @ ..] => {
+                        match atoi_u8(tail) {
+                            Some(pin_number) if (pin_number as usize) < pin_state.len() => {
+                                /*DEBUG*/
+                                ufmt::uwrite!(serial, "pin_number: {}\r\n", pin_number)
+                                    .void_unwrap();
+                                match &pin_state[pin_number as usize] {
+                                    PinState::Reserved => {
+                                        error(&mut serial, "Pin is reserved.");
+                                    }
+                                    PinState::InputFloating(pin) => {
+                                        ufmt::uwrite!(
+                                            serial,
+                                            "p{}={}\r\n",
+                                            pin_number,
+                                            pin.is_high().unwrap()
+                                        )
+                                        .void_unwrap();
+                                    }
+                                    PinState::InputAnalog(pin) => {
+                                        ufmt::uwrite!(
+                                            serial,
+                                            "p{}={}\r\n",
+                                            pin_number,
+                                            pin.is_high().unwrap()
+                                        )
+                                        .void_unwrap();
+                                    }
+                                    PinState::TriState(pin) => {
+                                        ufmt::uwrite!(
+                                            serial,
+                                            "p{}={}\r\n",
+                                            pin_number,
+                                            pin.is_high().unwrap()
+                                        )
+                                        .void_unwrap();
+                                    }
+                                    _ => {
+                                        error(&mut serial, "Pin is not in reading mode.");
+                                    }
+                                }
+                            }
+                            _ => {
+                                error(&mut serial, "Incorrect pin number.");
+                            }
+                        }
+                    }
                     _ => error(&mut serial, "Unknown command. Use \"h\" for help."),
                 }
             }

@@ -16,16 +16,15 @@ bench = false
 avr-std-stub = "1.0"
 
 # It's not packaged yet to crates.io, because it requires nightly version of Rust
-arduino-uno = { git = "https://github.com/Rahix/avr-hal", rev = "b1aedf82" }
+arduino-uno     = { git = "https://github.com/Rahix/avr-hal", rev = "b1aedf82" }
+atmega328p-hal  = { git = "https://github.com/Rahix/avr-hal", rev = "b1aedf82" }
+avr-hal-generic = { git = "https://github.com/Rahix/avr-hal", rev = "b1aedf82" }
 
 # Library for text formatting.
 ufmt = "0.1"
 
 # Non-blocking IO
 nb = "0.1"
-
-# AVR Hardware Abstraction Library.
-avr-hal-generic = { git = "https://github.com/Rahix/avr-hal", rev="b1aedf82" }
 
 # Settings for regular cargo invocation
 [profile.dev]

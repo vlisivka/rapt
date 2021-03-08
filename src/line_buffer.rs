@@ -106,22 +106,21 @@ impl<'a> LineBuffer<'a> {
         self.len = 0;
     }
 
-// Commented out because this version is longer by 20 bytes than explicit version.
-//
-//    /// Return iterator for words (separated by whitespace).
-//    pub fn words(&mut self) -> impl Iterator<Item=&[u8]> + '_ {
-//          self.line[0..self.len]
-//            .split(|byte| byte.is_ascii_whitespace())
-//            .filter(|s| !s.is_empty())
-//    }
+    // Commented out because this version is longer by 20 bytes than explicit version.
+    //
+    //    /// Return iterator for words (separated by whitespace).
+    //    pub fn words(&mut self) -> impl Iterator<Item=&[u8]> + '_ {
+    //          self.line[0..self.len]
+    //            .split(|byte| byte.is_ascii_whitespace())
+    //            .filter(|s| !s.is_empty())
+    //    }
 
     /// Return iterator for words (separated by whitespace).
     pub fn words<'r>(&'r mut self) -> Words<'r> {
         Words {
-          iter:
-          self.line[0..self.len]
-            .split(is_whitespace as fn (&u8) -> bool) // Hint compiler that we need function pointer here
-            .filter(is_not_empty)
+            iter: self.line[0..self.len]
+                .split(is_whitespace as fn(&u8) -> bool) // Hint compiler that we need function pointer here
+                .filter(is_not_empty),
         }
     }
 }
