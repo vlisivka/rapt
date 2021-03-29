@@ -35,18 +35,15 @@ const HELP: &str = "Rust-Arduino Pin Tester help:\r
 Use Backspace or ^H to erase last character. Use ^R to recall last line.\r
 \r
 Commands:\r
-h - this help\r
-o - turn pin into output pin\r
-i - turn pin into input pin (default)\r
-w - write value to an output pin\r
-r - read value of an input pin\r
+  h - this help\r
+  iPIN - turn pin into input only pin TODO\r
+  oPIN - turn pin into output only pin TODO\r
+  rPIN - read value of an input pin\r
+  wPINVAL - write value to an output pin. VAL can be l/L or h/H.\r
 ";
 
 /// Pin can be in one of states.
 enum PinState {
-    /// Pin is not configured yet.
-    Unknown,
-
     /// Pin is reserved for a reason.
     Reserved,
 
@@ -100,7 +97,7 @@ fn main() -> ! {
 
     let mut line_buffer = unsafe { LineBuffer::new(&mut LINE_BUFFER) };
 
-    let pin_state = [
+    let mut pin_state = [
         // Pins 0 and 1 are reserved for USART.
         PinState::Reserved,
         PinState::Reserved,
@@ -136,9 +133,7 @@ fn main() -> ! {
                     [b'r', tail @ ..] => {
                         match atoi_u8(tail) {
                             Some(pin_number) if (pin_number as usize) < pin_state.len() => {
-                                /*DEBUG*/
-                                ufmt::uwrite!(serial, "pin_number: {}\r\n", pin_number)
-                                    .void_unwrap();
+                                //*DEBUG*/ufmt::uwrite!(serial, "pin_number: {}\r\n", pin_number).void_unwrap();
                                 match &pin_state[pin_number as usize] {
                                     PinState::Reserved => {
                                         error(&mut serial, "Pin is reserved.");
@@ -172,6 +167,57 @@ fn main() -> ! {
                                     }
                                     _ => {
                                         error(&mut serial, "Pin is not in reading mode.");
+                                    }
+                                }
+                            }
+                            _ => {
+                                error(&mut serial, "Incorrect pin number.");
+                            }
+                        }
+                    }
+                    // w - write value to a pin
+                    [b'w', tail @ .., val] => {
+                        match atoi_u8(tail) {
+                            Some(pin_number) if (pin_number as usize) < pin_state.len() => {
+                                //*DEBUG*/ufmt::uwrite!(serial, "pin_number: {}\r\n", pin_number).void_unwrap();
+                                match &mut pin_state[pin_number as usize] {
+                                    PinState::Reserved => {
+                                        error(&mut serial, "Pin is reserved.");
+                                    }
+                                    PinState::Output(ref mut pin) => {
+                                        match val {
+                                            b'l' | b'L' => {
+                                                pin.set_low().expect("Cannot set to low");
+                                            }
+                                            b'h' | b'H' => {
+                                                pin.set_high().expect("Cannot set to high");
+                                            }
+                                            _ => {
+                                                error(&mut serial, "Incorrect pin output value. Must be L or H, e.g. w2h.");
+                                                continue;
+                                            }
+                                        };
+
+                                        ufmt::uwrite!(serial, "p{} OK\r\n", pin_number).void_unwrap();
+                                    }
+                                    PinState::TriState(ref mut pin) => {
+                                        match val {
+                                            b'l' | b'L' => {
+                                                pin.set_low().expect("Cannot set to low");
+                                            }
+                                            b'h' | b'H' => {
+                                                pin.set_high().expect("Cannot set to high");
+                                            }
+                                            _ => {
+                                                error(&mut serial, "Incorrect pin output value. Must be L or H, e.g. w2h.");
+                                                continue;
+                                            }
+                                        };
+
+                                        ufmt::uwrite!(serial, "p{} OK\r\n", pin_number).void_unwrap();
+                                    }
+                                    _ => {
+                                        error(&mut serial, "Pin is not in writing mode.");
                                     }
                                 }
                             }
