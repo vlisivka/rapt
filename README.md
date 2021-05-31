@@ -8,7 +8,7 @@ Requires rust nightly-2021-01-07, avr-gcc, avr-libc, and avrdude.
 
 To run, install avr-gcc, avrdude, Rust nightly 2021-01-07, then run scrip "./run.sh".
 
-To connect to Arduino, run script "./run-screen.sh". To exit screen, press <^A><\><y>.
+To connect to Arduino, run script "./run-screen.sh". To exit screen, press <^A><\\><y>.
 
 You can erase last character using <backspace> and recall last line for editing using <^R>.
 
